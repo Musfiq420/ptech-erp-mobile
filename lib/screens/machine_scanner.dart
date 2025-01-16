@@ -151,6 +151,7 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
   String? selectedCategory;
   List<dynamic> problemCategories = [];
   bool isFetchingProblemCategory = true;
+  String? successMessage;
 
   Future<String?> getDesignation() async {
     final storage = FlutterSecureStorage();
@@ -221,9 +222,8 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
                 Text("Machine ID: ${machine['machine_id']}"),
                 Text("Model Number: ${machine['model_number']}"),
                 Text("Serial No: ${machine['serial_no']}"),
-                Text("Purchase Date: ${machine['purchase_date']}"),
-                Text(
-                    "Last Breakdown Start: ${machine['last_breakdown_start']}"),
+                Text("Line: $machine['line']"),
+                Text("Sequence: $machine['sequence']"),
                 Text("Status: $machineStatus"),
                 Spacer(),
                 // SizedBox(height: 50),
@@ -246,30 +246,32 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
                   SizedBox(height: 16),
                   isPatching
                       ? CircularProgressIndicator()
-                      : ElevatedButton(
-                          onPressed: () {
-                            final currentTIme = DateTime.now()
-                                .toUtc()
-                                .toString()
-                                .split('.')
-                                .first;
-                            Map body = {
-                              "status": "broken",
-                              "last_breakdown_start":
-                                  currentTIme.split(" ")[0] +
-                                      "T" +
-                                      currentTIme.split(" ")[1] +
-                                      "Z",
-                              "last_problem": lastProblem
-                            };
+                      : successMessage != null
+                          ? Text("$successMessage")
+                          : ElevatedButton(
+                              onPressed: () {
+                                final currentTIme = DateTime.now()
+                                    .toUtc()
+                                    .toString()
+                                    .split('.')
+                                    .first;
+                                Map body = {
+                                  "status": "broken",
+                                  "last_breakdown_start":
+                                      currentTIme.split(" ")[0] +
+                                          "T" +
+                                          currentTIme.split(" ")[1] +
+                                          "Z",
+                                  "last_problem": lastProblem
+                                };
 
-                            print(body);
-                            updateMachineStatus(
-                                machineId: machine['id'].toString(),
-                                body: body);
-                          },
-                          child: const Text("Set to Broken"),
-                        ),
+                                print(body);
+                                updateMachineStatus(
+                                    machineId: machine['id'].toString(),
+                                    body: body);
+                              },
+                              child: const Text("Set to Broken"),
+                            ),
                 ] else if (designation == 'Supervisor' &&
                     machineStatus == 'maintenance') ...[
                   //&& machineStatus == 'maintenance'
@@ -279,80 +281,84 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
 
                   problemCategories.isEmpty
                       ? CircularProgressIndicator()
-                      : DropdownButton<String>(
-                          value: selectedCategory,
-                          hint: Text("Selected Problem Category:"),
-                          items: problemCategories.map((category) {
-                            return DropdownMenuItem<String>(
-                              value: category['id'].toString(),
-                              child: Text(category['name']),
-                            );
-                          }).toList(),
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedCategory = newValue;
-                              selectedCategoryIndex = int.parse(newValue!);
-                              print(selectedCategoryIndex);
-                            });
-                          },
-                        ),
+                      : successMessage != null
+                          ? Text("$successMessage")
+                          : DropdownButton<String>(
+                              value: selectedCategory,
+                              hint: Text("Selected Problem Category:"),
+                              items: problemCategories.map((category) {
+                                return DropdownMenuItem<String>(
+                                  value: category['id'].toString(),
+                                  child: Text(category['name']),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  selectedCategory = newValue;
+                                  selectedCategoryIndex = int.parse(newValue!);
+                                  print(selectedCategoryIndex);
+                                });
+                              },
+                            ),
                   const SizedBox(height: 16.0),
 
                   isPatching
                       ? CircularProgressIndicator()
-                      : ElevatedButton(
-                          onPressed: () {
-                            if (selectedCategoryIndex == -1) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      "Category should be selected should not be 0!"),
-                                  duration: Duration(seconds: 2),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                              return;
-                            }
-                            DateTime startTime = DateTime.parse(
-                                "${machine['last_breakdown_start']}");
-                            DateTime endTime = DateTime.parse(DateTime.now()
-                                    .toUtc()
+                      : successMessage != null
+                          ? Text("$successMessage")
+                          : ElevatedButton(
+                              onPressed: () {
+                                if (selectedCategoryIndex == -1) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          "Category should be selected should not be 0!"),
+                                      duration: Duration(seconds: 2),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                DateTime startTime = DateTime.parse(
+                                    "${machine['last_breakdown_start']}");
+                                DateTime endTime = DateTime.parse(DateTime.now()
+                                        .toUtc()
+                                        .toString()
+                                        .split('.')
+                                        .first +
+                                    'Z');
+                                String formattedDuration = endTime
+                                    .difference(startTime)
                                     .toString()
                                     .split('.')
-                                    .first +
-                                'Z');
-                            String formattedDuration = endTime
-                                .difference(startTime)
-                                .toString()
-                                .split('.')
-                                .first;
+                                    .first;
 
-                            Map body = {
-                              "status": "active",
-                            };
+                                Map body = {
+                                  "status": "active",
+                                };
 
-                            final breakdownBody = {
-                              "breakdown_start": "$startTime",
-                              "repairing_start":
-                                  "${machine['last_repairing_start'] ?? "2025-01-09T11:50:00Z"}",
-                              "lost_time": formattedDuration,
-                              "comments": "",
-                              "machine": "${machine['id']}",
-                              "mechanic": "",
-                              "operator": "",
-                              "problem_category": "$selectedCategoryIndex",
-                              "location": "1",
-                              "line": "${machine['line']}",
-                            };
-                            print(breakdownBody);
-                            updateMachineStatus(
-                                machineId: machine['id'].toString(),
-                                body: body,
-                                willUpdateBreakdown: true,
-                                breakdownBody: breakdownBody);
-                          },
-                          child: const Text("Set to Active"),
-                        ),
+                                final breakdownBody = {
+                                  "breakdown_start": "$startTime",
+                                  "repairing_start":
+                                      "${machine['last_repairing_start'] ?? "2025-01-09T11:50:00Z"}",
+                                  "lost_time": formattedDuration,
+                                  "comments": "",
+                                  "machine": "${machine['id']}",
+                                  "mechanic": "",
+                                  "operator": "",
+                                  "problem_category": "$selectedCategoryIndex",
+                                  "location": "1",
+                                  "line": "${machine['line']}",
+                                };
+                                print(breakdownBody);
+                                updateMachineStatus(
+                                    machineId: machine['id'].toString(),
+                                    body: body,
+                                    willUpdateBreakdown: true,
+                                    breakdownBody: breakdownBody);
+                              },
+                              child: const Text("Set to Active"),
+                            ),
                 ] else if (designation == 'Mechanic' &&
                     machineStatus == 'broken') ...[
                   //stage broken to maintenance
@@ -362,27 +368,29 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
                   const SizedBox(height: 16.0),
                   isPatching
                       ? CircularProgressIndicator()
-                      : ElevatedButton(
-                          onPressed: () {
-                            final currentTIme = DateTime.now()
-                                .toUtc()
-                                .toString()
-                                .split('.')
-                                .first;
-                            Map body = {
-                              "status": "maintenance",
-                              "last_repairing_start":
-                                  currentTIme.split(" ")[0] +
-                                      "T" +
-                                      currentTIme.split(" ")[1] +
-                                      "Z"
-                            };
-                            updateMachineStatus(
-                                machineId: machine['id'].toString(),
-                                body: body);
-                          },
-                          child: const Text("Set to Maintenance"),
-                        ),
+                      : successMessage != null
+                          ? Text("$successMessage")
+                          : ElevatedButton(
+                              onPressed: () {
+                                final currentTIme = DateTime.now()
+                                    .toUtc()
+                                    .toString()
+                                    .split('.')
+                                    .first;
+                                Map body = {
+                                  "status": "maintenance",
+                                  "last_repairing_start":
+                                      currentTIme.split(" ")[0] +
+                                          "T" +
+                                          currentTIme.split(" ")[1] +
+                                          "Z"
+                                };
+                                updateMachineStatus(
+                                    machineId: machine['id'].toString(),
+                                    body: body);
+                              },
+                              child: const Text("Set to Maintenance"),
+                            ),
                 ] else if (designation == 'Admin Officer') ...[
                   Text("Your Role: $designation"),
                   const Text("Change machine status to:"),
@@ -442,6 +450,12 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
       } else {
         print("will not Update breaddwonLodg");
       }
+      setState(() {
+        isPatching = true;
+        successMessage =
+            "Machine status updated successfully to ${body['status']}";
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content:
@@ -451,6 +465,10 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
       );
     } catch (e) {
       print("Error: $e");
+      setState(() {
+        isPatching = false;
+        successMessage = "An error occurred while updating status.";
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("An error occurred while updating status."),
