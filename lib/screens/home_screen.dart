@@ -42,19 +42,19 @@ class _HomeScreenState extends State<HomeScreen> {
           Btn("Production", ProductionPage()),
           Btn("Maintenance", Maintanance()),
           Btn("Inventory", InventoryPage()),
-          ElevatedButton(
-              onPressed: () async {
-                final securedDesignation = "designation";
-                final desg = await storage.read(key: securedDesignation);
-                if (desg == "Mechanic") {
-                  await storage.write(
-                      key: securedDesignation, value: "Supervisor");
-                } else {
-                  await storage.write(
-                      key: securedDesignation, value: "Mechanic");
-                }
-              },
-              child: Text("change designation"))
+          // ElevatedButton(
+          //     onPressed: () async {
+          //       final securedDesignation = "designation";
+          //       final desg = await storage.read(key: securedDesignation);
+          //       if (desg == "Mechanic") {
+          //         await storage.write(
+          //             key: securedDesignation, value: "Supervisor");
+          //       } else {
+          //         await storage.write(
+          //             key: securedDesignation, value: "Mechanic");
+          //       }
+          //     },
+          //     child: Text("change designation"))
         ]),
       );
     }

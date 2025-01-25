@@ -25,7 +25,7 @@ class Maintanance extends StatelessWidget {
           child: Column(
             children: [
               Btn("All Machines", AllMaintainances()),
-              Btn("BreakdownLogs", BreakdownPage()),
+              // Btn("BreakdownLogs", BreakdownPage()),
             ],
           ),
         ),
@@ -116,12 +116,12 @@ class _MachineListScreenState extends State<AllMaintainances> {
 
 Future<List> fetchMachines() async {
   final url = Uri.parse(
-      "https://machine-maintenance.onrender.com/api/maintenance/machines/");
+      "https://machine-maintenance.ddns.net/api/maintenance/machines/");
 
   final response = await http.get(url);
   if (response.statusCode == 200) {
     print(response.body);
-    final data = jsonDecode(response.body)["results"];
+    final data = jsonDecode(response.body);
     print(data);
     return data;
   } else {

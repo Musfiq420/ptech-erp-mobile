@@ -78,14 +78,14 @@ class _MachineScannerPageState extends State<MachineScanner> {
 
   Future<Map?> funcFetchMachineDetails(String model) async {
     final url = Uri.parse(
-        "https://machine-maintenance.onrender.com/api/maintenance/machines/?machine_id=$model");
+        "https://machine-maintenance.ddns.net/api/maintenance/machines/?machine_id=$model");
 
     final headers = {'Content-Type': 'application/json'};
     final response = await http.get(url);
     final designatione =
         await storage.read(key: securedDesignation) ?? "Unknown";
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      return jsonDecode(response.body)[0];
     }
     return null;
   }
@@ -102,6 +102,11 @@ class _MachineScannerPageState extends State<MachineScanner> {
         } else if (snapshot.hasData) {
           return MachineDetailsPage(
             machineDetails: snapshot.data!,
+            onScanAgain: () {
+              setState(() {
+                isScanning = true;
+              });
+            },
           );
         } else {
           return Center(
@@ -118,17 +123,17 @@ class _MachineScannerPageState extends State<MachineScanner> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                isScanning = true;
-              });
-            },
-            child: const Text("Scan Again"),
-          )
-        ],
-      ),
+          // actions: [
+          //   ElevatedButton(
+          //     onPressed: () {
+          //       setState(() {
+          //         isScanning = true;
+          //       });
+          //     },
+          //     child: const Text("Scan Again"),
+          //   )
+          // ],
+          ),
       body: isScanning
           ? funcScannerBuilder()
           : funcMachineDetailsBuilder(
@@ -139,7 +144,9 @@ class _MachineScannerPageState extends State<MachineScanner> {
 
 class MachineDetailsPage extends StatefulWidget {
   final Map machineDetails;
-  const MachineDetailsPage({super.key, required this.machineDetails});
+  final VoidCallback onScanAgain;
+  const MachineDetailsPage(
+      {super.key, required this.machineDetails, required this.onScanAgain});
 
   @override
   _MachineDetailsPageState createState() => _MachineDetailsPageState();
@@ -151,7 +158,9 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
   String? selectedCategory;
   List<dynamic> problemCategories = [];
   bool isFetchingProblemCategory = true;
+  List<dynamic> lines = [];
   String? successMessage;
+  Map<String, dynamic> matchingLine = {};
 
   Future<String?> getDesignation() async {
     final storage = FlutterSecureStorage();
@@ -166,13 +175,15 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
     super.initState();
     print("initiated");
     fetchProblemCategories();
+    fetchLines();
     print("fetched");
+
     isFetchingProblemCategory = false;
   }
 
   Future<void> fetchProblemCategories() async {
     final String apiUrl =
-        "https://machine-maintenance.onrender.com/api/maintenance/problem-category/"; // Replace with your API URL
+        "https://machine-maintenance.ddns.net/api/maintenance/problem-category/"; // Replace with your API URL
     try {
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
@@ -187,9 +198,32 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
     }
   }
 
+  Future<void> fetchLines() async {
+    final String apiUrl =
+        "https://machine-maintenance.ddns.net/api/production/lines/"; // Replace with your API URL
+    try {
+      final response = await http.get(Uri.parse(apiUrl));
+      if (response.statusCode == 200) {
+        print(response.body);
+        setState(() {
+          lines = json.decode(response.body);
+          matchingLine = lines.firstWhere(
+            (line) => line['id'] == widget.machineDetails['line'],
+            orElse: () => {},
+          );
+        });
+      } else {
+        throw Exception('Failed to load data');
+      }
+    } catch (e) {
+      print('Error fetching data: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final machine = widget.machineDetails['results'][0];
+    final machine = widget.machineDetails;
+    print(widget.machineDetails);
     final statuses = ['active', 'inactive', 'maintenance', 'broken'];
     final problemCategory = [
       'Problem Cat 1',
@@ -219,11 +253,25 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Machine ID: ${machine['machine_id']}"),
+                Text(
+                  "Machine ${machine['machine_id']}",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+                ),
+                Text(
+                  "Line: ${matchingLine != {} ? matchingLine['name'] : ""}",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  "Floor: ${matchingLine != {} ? matchingLine['floor']['name'] : ""}",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  "Sequence: ${machine['sequence']}",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 Text("Model Number: ${machine['model_number']}"),
                 Text("Serial No: ${machine['serial_no']}"),
-                Text("Line: ${machine['line']}"),
-                Text("Sequence: ${machine['sequence']}"),
+
                 Text("Status: $machineStatus"),
                 Spacer(),
                 // SizedBox(height: 50),
@@ -231,18 +279,24 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
                 if (designation == 'Supervisor' &&
                     machineStatus == 'active') ...[
                   //stage active to broken  && machineStatus == 'active'
-                  Text("Your Role: $designation"),
-                  const Text("Is the machine broken?"),
-                  SizedBox(height: 16),
-                  TextField(
-                    decoration: InputDecoration(
-                        hintText: '',
-                        border: OutlineInputBorder(),
-                        labelText: "Explain the problem:"),
-                    onChanged: (value) {
-                      lastProblem = value;
-                    },
-                  ),
+                  successMessage == null
+                      ? Text("Your Role: $designation")
+                      : Spacer(),
+                  successMessage == null
+                      ? const Text("Is the machine broken?")
+                      : Spacer(),
+                  successMessage == null ? SizedBox(height: 16) : Spacer(),
+                  successMessage == null
+                      ? TextField(
+                          decoration: InputDecoration(
+                              hintText: '',
+                              border: OutlineInputBorder(),
+                              labelText: "Explain the problem:"),
+                          onChanged: (value) {
+                            lastProblem = value;
+                          },
+                        )
+                      : Spacer(),
                   SizedBox(height: 16),
                   isPatching
                       ? CircularProgressIndicator()
@@ -275,9 +329,15 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
                 ] else if (designation == 'Supervisor' &&
                     machineStatus == 'maintenance') ...[
                   //&& machineStatus == 'maintenance'
-                  Text("Your Role: $designation"),
-                  const Text("Is the machine active now?"),
-                  const SizedBox(height: 16.0),
+                  successMessage == null
+                      ? Text("Your Role: $designation")
+                      : Spacer(),
+                  successMessage == null
+                      ? const Text("Is the machine active now?")
+                      : Spacer(),
+                  successMessage == null
+                      ? const SizedBox(height: 16.0)
+                      : Spacer(),
 
                   problemCategories.isEmpty
                       ? CircularProgressIndicator()
@@ -362,10 +422,16 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
                 ] else if (designation == 'Mechanic' &&
                     machineStatus == 'broken') ...[
                   //stage broken to maintenance
-                  Text("Your Role: $designation"),
-                  const Text(
-                      "Do you want to set the machine status to Maintenance?"),
-                  const SizedBox(height: 16.0),
+                  successMessage == null
+                      ? Text("Your Role: $designation")
+                      : Spacer(),
+                  successMessage == null
+                      ? const Text(
+                          "Do you want to set the machine status to Maintenance?")
+                      : Spacer(),
+                  successMessage == null
+                      ? const SizedBox(height: 16.0)
+                      : Spacer(),
                   isPatching
                       ? CircularProgressIndicator()
                       : successMessage != null
@@ -410,6 +476,10 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
                     },
                   ),
                 ],
+                ElevatedButton(
+                  onPressed: widget.onScanAgain,
+                  child: const Text("Scan Again"),
+                ),
               ],
             ),
           );
@@ -425,9 +495,9 @@ class _MachineDetailsPageState extends State<MachineDetailsPage> {
       Map breakdownBody = const {},
       bool willUpdateBreakdown = false}) async {
     final url =
-        "https://machine-maintenance.onrender.com/api/maintenance/machines/$machineId/";
+        "https://machine-maintenance.ddns.net/api/maintenance/machines/$machineId/";
     final breakDownUrl =
-        "https://machine-maintenance.onrender.com/api/maintenance/breakdown-logs/";
+        "https://machine-maintenance.ddns.net/api/maintenance/breakdown-logs/";
 
     setState(() {
       isPatching = true;
